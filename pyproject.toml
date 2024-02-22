@@ -5,7 +5,7 @@ description = "Correct grammatical and spelling errors in Ukrainian texts."
 authors = ["Oleh Neichev <oleg.neichev@gmail.com>"]
 license = "MIT"
 readme = "README.md"
-packages = [{include = "gec_ua"}]
+packages = [{include = "grammar-tag"}]
 
 [tool.poetry.dependencies]
 python = ">=3.9,<4.0"
