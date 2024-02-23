@@ -1,6 +1,4 @@
-import re
 from ua_gec import Corpus, AnnotatedText
-from ua_gec.annotated_text import Annotation
 from datasets import Dataset, DatasetDict
 import pandas as pd
 import torch
@@ -11,46 +9,6 @@ from .transformations import Token, Text
 from transformers import (AutoTokenizer, Trainer, TrainingArguments,
                           DataCollatorForTokenClassification,
                           AutoModelForTokenClassification, EarlyStoppingCallback)
-
-class Text:
-
-    # inspired by https://stackoverflow.com/questions/9644784/splitting-on-spaces-except-between-certain-characters
-    # split an annotated string by annotation and namespace but ommit spaces in annotations
-    ANNOTATION_SPACE_SPLIT_REGEX = re.compile(
-        r'\s+(?=[^{}]*(?:\{.*:::.*\}|$))')
-    # split an annotated string only by annotation that contains source text
-    # e.g. `мінімум {, =>:::error_type=Punctuation}{=>— :::error_type=Punctuation}знати`
-    # -> ["мінімум ", "{, =>:::error_type=Punctuation}", "{=>— :::error_type=Punctuation}знати"]
-    ANNOTATION_SPLIT_REGEX = re.compile(r'({[^{}]+?=>.*?:::.*?})')
-
-    def __init__(self, text: str, metadata) -> None:
-        self.text = AnnotatedText(text)
-        self.tokens: List[Token] = self.tokenize()
-        self.metadata = metadata
-
-    def __repr__(self) -> str:
-        return self.text.get_annotated_text()
-
-    def tokenize(self) -> List[Token]:
-        """
-        Tokenize Sequence
-        1. Split by whitespace excluding whitespaces in annotations
-        2. Split by annotations that contain source text (source_text is not empty)
-        """
-        raw_tokens = []
-        self.tokens = []
-        for _token in self.ANNOTATION_SPACE_SPLIT_REGEX.split(
-                self.text.get_annotated_text()):
-            sub_tokens = [
-                t for t
-                in self.ANNOTATION_SPLIT_REGEX.split(_token) if t
-            ]
-            raw_tokens.extend(sub_tokens)
-
-        for i, raw_token in enumerate(raw_tokens):
-            self.tokens.append(Token(text=raw_token, index=i))
-
-        return self.tokens
 
 class Seq2TagManager:
 
@@ -339,7 +297,7 @@ class Seq2TagManager:
             tokenizer=self.tokenizer,
             data_collator=self.data_collator,
             compute_metrics=self.compute_metrics,
-            callbacks=[EarlyStoppingCallback(early_stopping_patience=2)]
+            callbacks=[EarlyStoppingCallback(early_stopping_patience=1)]
         )
 
         self.trainer.train()

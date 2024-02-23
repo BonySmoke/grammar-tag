@@ -1,3 +1,4 @@
+import re
 from ua_gec import AnnotatedText
 from transformers import pipeline, Pipeline
 from .transformations import Transformations
@@ -23,7 +24,7 @@ class Correcter:
             that are computed, e.g. $PREPEND__PUNCTUATION__START_—_SPACE_
         """
         self.classifier = classifier if classifier else self._load_classifier()
-        self.annotated_text = AnnotatedText(text)
+        self.annotated_text = AnnotatedText(re.sub(' +', ' ', text))
         self.min_score = min_score
         self.min_delete_score = min_delete_score
         self.exclude_tags = exclude_tags
