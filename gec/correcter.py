@@ -5,6 +5,86 @@ from .transformations import Transformations
 from .log import create_logger
 
 
+class WordAligner:
+
+    PUNCTUATION = [",", ".", "!", "?", ":", ";", "&"]
+    MERGE_TAGS = ["$KEEP", "$DELETE"]
+
+    def __init__(self) -> None:
+        pass
+
+    def separate_words(self, previous: dict, current: dict) -> bool:
+        return previous["word"].endswith(' ') or current["word"].startswith(' ')
+
+    def separate_punctuation(self, previous: dict, current: dict) -> bool:
+        return (any(previous["word"].endswith(p) for p in self.PUNCTUATION)
+                    or any(current["word"].startswith(p) for p in self.PUNCTUATION))
+
+    def not_merge_tags(self, previous: dict, current: dict) -> bool:
+        return (current['entity_group'] not in self.MERGE_TAGS
+                    and previous["entity_group"] not in self.MERGE_TAGS)
+
+    def replace_punctuation(self, previous: dict, current: dict) -> bool:
+        return ("REPLACE__PUNCTUATION" in current['entity_group']
+                    or "REPLACE__PUNCTUATION" in previous["entity_group"])
+
+    def align_words(self, prediction: list):
+        merge_tags = ["$KEEP", "$DELETE"]
+        groups = list()
+        for group in prediction:
+            group = group.copy()
+            if not groups:
+                groups.append(group)
+                continue
+
+            previous = groups[-1]
+            # the previous word ends with a space or the new word starts with a space
+            # which means these are separate words
+            if self.separate_words(previous, group):
+                groups.append(group)
+                continue
+            # the previous word or the new word ends/starts with a punctuation sign
+            # let's consider these 2 different groups
+            if self.separate_punctuation(previous, group):
+                groups.append(group)
+                continue
+            # we are dealing with different tags, we must not merge them
+            # for example, ["APPEND", "APPEND"] will be merged but
+            # ["KEEP", "KEEP"] won't be
+            if self.not_merge_tags(previous, group):
+                if group['entity_group'] != previous["entity_group"]:
+                    groups.append(group)
+                    continue
+            if self.replace_punctuation(previous, group):
+                groups.append(group)
+                continue
+
+            old_word = previous["word"].split()[-1]
+            new_word = group["word"].split()[0]
+            merged_group_word = old_word + new_word
+
+            # this means the group we are merging with is the current group
+            if group["entity_group"] not in merge_tags:
+                target_group = group
+                start, end = target_group["start"] - \
+                    len(old_word), target_group["end"]
+            # we are merging with is the previous group
+            else:
+                target_group = previous
+                start, end = target_group["start"], target_group["end"] + \
+                    len(new_word)
+
+            previous.update({
+                "entity_group": target_group["entity_group"],
+                "score": target_group["score"],
+                "word": merged_group_word,
+                "start": start,
+                "end": end
+            }
+            )
+        return groups
+
+
 class Correcter:
 
     DEFAULT_PIPELINE = "BonySmoke/gec_uk_seq2tag"
@@ -35,48 +115,7 @@ class Correcter:
         return self.annotated_text.get_original_text()
 
     def align_words(self, prediction: list):
-        merge_tags = ["$KEEP", "$DELETE"]
-        groups = list()
-        for group in prediction:
-            group = group.copy()
-            if not groups:
-                groups.append(group)
-                continue
-            # the previous word ends with a space or the new word starts with a space
-            # which means these are separate words
-            if groups[-1]["word"].endswith(' ') or group["word"].startswith(' '):
-                groups.append(group)
-                continue
-            # we are dealing with different tags, we must not merge them
-            if group['entity_group'] not in merge_tags and groups[-1]["entity_group"] not in merge_tags:
-                groups.append(group)
-                continue
-            if "PUNCTUATION" in group['entity_group'] or "PUNCTUATION" in groups[-1]["entity_group"]:
-                groups.append(group)
-                continue
-
-            old_word = groups[-1]["word"].split()[-1]
-            new_word = group["word"].split()[0]
-            merged_group_word = old_word + new_word
-
-            # this means the group we are merging with is the current group
-            if group["entity_group"] not in merge_tags:
-                target_group = group
-                start, end = target_group["start"] - len(old_word), target_group["end"]
-            # we are merging with is the previous group
-            else:
-                target_group = groups[-1]
-                start, end = target_group["start"], target_group["end"] + len(new_word)
-
-            groups[-1].update({
-                "entity_group": target_group["entity_group"],
-                "score": target_group["score"],
-                "word": merged_group_word,
-                "start": start,
-                "end": end
-              }
-            )
-        return groups
+        return WordAligner().align_words(prediction)
 
     def predict(self):
         prediction = self.classifier(self.original_text)
@@ -98,7 +137,7 @@ class Correcter:
             if span["score"] < self.min_score:
                 continue
             if entity == "$DELETE" and span["score"] < self.min_delete_score:
-              continue
+                continue
             clean_prediction.append(span)
 
         return clean_prediction

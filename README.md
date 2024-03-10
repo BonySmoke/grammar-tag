@@ -22,7 +22,7 @@ seq2tag.push() # you will need to log in to your HuggingFace account first
 
 ## Accuracy & Performance
 The model was trained only on the GEC part of the [UA-GEC dataset](https://github.com/grammarly/ua-gec).<br>
-It reaches `63.46%` F0.5 score on the [UNLP 2023 Shared Task in Grammatical Error Correction for Ukrainian](https://github.com/osyvokon/unlp-2023-shared-task/tree/main). The model performs worse than those presented by other participants but it serves as a foundation for training larger models using synthetic data.
+It reaches the F0.5 score of `0.6707` on the [UNLP 2023 Shared Task in Grammatical Error Correction for Ukrainian](https://github.com/osyvokon/unlp-2023-shared-task/tree/main). The model is not supposed to be used in production but it serves as a foundation for training larger models using synthetic data.
 
 Since the model predicts the transformation tag for a token instead of rewriting it, the model is pretty fast. Correcting the UA-GEC test dataset (1509 documents) with 3 stages takes only `~82` seconds on a single GPU.
 
